@@ -10,8 +10,10 @@ Where:
 - R = rank
 - d = number of standard deviations away from average elo difference from seed
 
-If a player isn't within +- 100*(10*e^(-0.3n)+1)*(t+1) elo of the seed, where t is the time the player spent waiting in queue,
+If a player isn't within +- K*(10*e^(-0.3n)+1)*(t+1) elo of the seed, where t is the time the player spent waiting in queue,
 then set their score to 0 so they can't be selected.
+
+K = (max(elos) - min(elos))/n
 
 Normalise all scores so that they sum to 1, then use those as the probability the player is selected to be in the match.
 
@@ -25,15 +27,16 @@ import numpy as np
 score = lambda R, d, n: 1/R**(np.log(n)*d)
 search_adj = lambda n: 10*np.exp(-0.3*n) + 1
 
-ELO_RANGE = 100
-
 def match(players, seed_i, n):
     """Create a single match using players[seed_i] as the seed player, if possible"""
     players = sorted(players, key=lambda x: x[1]) # player[0] = name, player[1] = elo, player[3] = time in queue
     ranks = np.array([abs(i-seed_i) for i in range(len(players))], dtype=np.float32) # absolute rank of player relative to seed
 
-    elo_diffs = np.array([players[i][1] for i in range(len(players))], dtype=np.float32) - players[seed_i][1]
+    elos = np.array([players[i][1] for i in range(len(players))], dtype=np.float32)
+    elo_diffs = elos - players[seed_i][1]
     elo_diffs_std = np.abs(elo_diffs/np.std(elo_diffs)) # Scaling values in terms of the standard deviation
+
+    elo_range = (max(elos) - min(elos))/n
 
     scores = np.array([score(ranks[i], elo_diffs_std[i], len(players)) for i in range(len(players))])
     scores[seed_i] = 0
@@ -41,7 +44,7 @@ def match(players, seed_i, n):
     possible_players = 0
     for i in range(len(scores)):
         # If the player's elo is out of the seed player's elo searching range, then set their score to zero
-        if np.abs(players[i][1] - players[seed_i][1]) > ELO_RANGE*search_adj(n)*(players[seed_i][2]+1):
+        if np.abs(players[i][1] - players[seed_i][1]) > ((max(elos) - min(elos))/n)*search_adj(n)*(players[seed_i][2]+1):
             scores[i] = 0
         else:
             possible_players += 1
@@ -110,33 +113,53 @@ def write_matches(matches):
     for i in range(len(matches)):
         matches_dict[i] = matches[i]
     with open("matches.json", "w") as f:
-        f.write(json.dumps(matches_dict))
+        f.write(json.dumps(matches_dict, indent=2))
 
 if __name__ == "__main__":
+    """
     if len(sys.argv) != 2:
         print("Please pass name of JSON file as a command line argument.")
         sys.exit(2)
+    """
     
     # Read JSON file into program
-    players = format_data(sys.argv[1]) # ./Elo-MMR/data/coup/all_players.csv
+    # players = format_data(sys.argv[1]) # ./Elo-MMR/data/coup/all_players.csv
 
     np.set_printoptions(precision=6, suppress=True)
+    players = [
+        ("1", 2800, 0),
+        ("2", 1500, 0),
+        ("3", 1700, 0),
+        ("4", 1600, 0),
+        ("5", 1000, 3),
+        ("6", 2828, 0),
+        ("7", 2812, 0),
+        ("8", 741, 6),
+        ("9", 2045, 0),
+        ("10", 2623, 0),
+        ("14", 2400, 0),
+        ("15", 2450, 0),
+        ("11", 1515, 0),
+        ("12", 1138, 2),
+        ("13", 1965, 0),
+    ]
+
     # players = [
-    #     ("1", 2800, 0),
-    #     ("2", 1500, 0),
-    #     ("3", 1700, 0),
-    #     ("4", 1600, 0),
-    #     ("5", 1000, 3),
-    #     ("6", 2828, 0),
-    #     ("7", 2812, 0),
-    #     ("8", 741, 6),
-    #     ("9", 2045, 0),
-    #     ("10", 2623, 0),
-    #     ("14", 2400, 0),
-    #     ("15", 2450, 0),
-    #     ("11", 1515, 0),
-    #     ("12", 1138, 2),
-    #     ("13", 1965, 0),
+    #     ("Shrek", 1557, 0),
+    #     ("Figments", 1516, 0),
+    #     ("Nguyen", 1476, 0),
+    #     ("rome", 1440, 0),
+    #     ("Foreign Counter Example", 1401, 0),
+    #     ("Adam^2", 1388, 0),
+    #     ("Coup d'état", 1384, 0),
+    #     ("Alpha Coup", 1378, 0),
+    #     ("Assassin Example", 1357, 0),
+    #     ("Submission Template", 1348, 0),
+    #     ("Counter Example", 1336, 0),
+    #     ("Ambassador Example", 1333, 0),
+    #     ("devtest", 1300, 0),
+    #     ("Simple Example", 1285, 0),
+    #     ("Challenger Example", 1160, 0)
     # ]
 
     # players = [
